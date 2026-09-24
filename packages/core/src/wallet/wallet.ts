@@ -14,6 +14,25 @@ export interface WalletOpts {
   ownerKeypair?: Keypair;
 }
 
+export interface WalletRegistry {
+  register(address: string): Promise<void> | void;
+  list(): Promise<string[]> | string[];
+}
+
+export class InMemoryWalletRegistry implements WalletRegistry {
+  private addresses: string[] = [];
+
+  register(address: string): void {
+    if (!this.addresses.includes(address)) {
+      this.addresses.push(address);
+    }
+  }
+
+  list(): string[] {
+    return [...this.addresses];
+  }
+}
+
 export class Wallet {
   private client: StellarClient;
   private sponsorKeypair: Keypair;

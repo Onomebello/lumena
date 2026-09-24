@@ -94,17 +94,68 @@ export function toScVal(input: ContractArg | any, explicitType?: ScValType): xdr
 
 /**
  * Converts a Soroban xdr.ScVal into its native JavaScript representation.
+ *
+ * Handles all common ScVal types explicitly so contract return values can be
+ * decoded reliably:
+ *  - scvAddress -> string (StrKey G.../C...)
+ *  - scvMap     -> plain object (string keys) or Map for non-string keys
+ *  - scvVec     -> array
+ *  - scvBytes   -> Uint8Array
+ *  - scvBool    -> boolean
+ *  - scvSymbol  -> string
+ *  - scvI128    -> bigint
+ *  - scvU128    -> bigint
  */
 export function fromScVal(scVal: any): any {
-  if (!scVal) return null;
-  if (scVal instanceof xdr.ScVal) {
-    return scValToNative(scVal);
+  if (scVal === null || scVal === undefined) return null;
+
+  // Unwrap common result envelopes before decoding.
+  if (scVal && !(scVal instanceof xdr.ScVal)) {
+    if (scVal.retval) {
+      return fromScVal(scVal.retval);
+    }
+    if (scVal.result?.retval) {
+      return fromScVal(scVal.result.retval);
+    }
   }
-  if (scVal.retval) {
-    return fromScVal(scVal.retval);
+
+  if (!(scVal instanceof xdr.ScVal)) {
+    return scVal;
   }
-  if (scVal.result?.retval) {
-    return fromScVal(scVal.result.retval);
+
+  switch (scVal.switch()) {
+    case xdr.ScValType.scvAddress():
+      return Address.fromScVal(scVal).toString();
+    case xdr.ScValType.scvMap(): {
+      const entries = scVal.map() ?? [];
+      const result: Record<string, any> = {};
+      let allStringKeys = true;
+      const map = new Map<any, any>();
+      for (const entry of entries) {
+        const key = fromScVal(entry.key());
+        const val = fromScVal(entry.val());
+        map.set(key, val);
+        if (typeof key === "string") {
+          result[key] = val;
+        } else {
+          allStringKeys = false;
+        }
+      }
+      return allStringKeys ? result : map;
+    }
+    case xdr.ScValType.scvVec():
+      return (scVal.vec() ?? []).map((item) => fromScVal(item));
+    case xdr.ScValType.scvBytes():
+      return new Uint8Array(scVal.bytes());
+    case xdr.ScValType.scvBool():
+      return scVal.b();
+    case xdr.ScValType.scvSymbol():
+      return scVal.sym().toString();
+    case xdr.ScValType.scvI128():
+      return scVal.i128().toBigInt();
+    case xdr.ScValType.scvU128():
+      return scVal.u128().toBigInt();
+    default:
+      return scValToNative(scVal);
   }
-  return scVal;
 }
