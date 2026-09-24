@@ -89,6 +89,32 @@ policyCmd
     }
   });
 
+policyCmd
+  .command("delete <walletId>")
+  .description("Delete the policy for a wallet")
+  .option("-s, --server <url>", "Lumen server URL", DEFAULT_SERVER_URL)
+  .action(async (walletId, options) => {
+    try {
+      const res = await fetch(`${options.server}/policy/${walletId}`, {
+        method: "DELETE",
+      });
+
+      if (res.status === 404) {
+        throw new Error(`Policy not found for wallet: ${walletId}`);
+      }
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Failed to delete policy: HTTP ${res.status} - ${errText}`);
+      }
+
+      console.log(`Policy for wallet ${walletId} deleted successfully.`);
+    } catch (err: any) {
+      console.error("Error deleting policy:", err.message || err);
+      process.exit(1);
+    }
+  });
+
 const walletCmd = program.command("wallet").description("Manage test sponsored wallets");
 
 walletCmd

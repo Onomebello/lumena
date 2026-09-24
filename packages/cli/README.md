@@ -32,14 +32,21 @@ Applies policy rules defined in a JSON file to a wallet.
 npx @lumen/cli policy set ./policy-spec.json
 ```
 
-### 4. `lumen wallet create`
+### 4. `lumen policy delete <walletId>`
+Removes the policy for the specified wallet ID.
+
+```bash
+npx @lumen/cli policy delete G...
+```
+
+### 5. `lumen wallet create`
 Triggers creation of a new test sponsored wallet on the server.
 
 ```bash
 npx @lumen/cli wallet create
 ```
 
-### 5. `lumen cosign inspect <xdr>`
+### 6. `lumen cosign inspect <xdr>`
 Decodes transaction XDR, displays operation details, and simulates policy checks.
 
 ```bash
