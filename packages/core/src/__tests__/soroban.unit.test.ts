@@ -49,6 +49,64 @@ describe("Soroban ScVal Conversion & ContractClient Unit Tests", () => {
       const res = fromScVal(scValBytes);
       expect(Buffer.from(res).toString("hex")).toBe("deadbeef");
     });
+
+    it("decodes scvBool to boolean", () => {
+      expect(fromScVal(xdr.ScVal.scvBool(true))).toBe(true);
+      expect(fromScVal(xdr.ScVal.scvBool(false))).toBe(false);
+    });
+
+    it("decodes scvSymbol to string", () => {
+      const scVal = xdr.ScVal.scvSymbol("transfer");
+      expect(fromScVal(scVal)).toBe("transfer");
+    });
+
+    it("decodes scvBytes to Uint8Array", () => {
+      const scVal = xdr.ScVal.scvBytes(Buffer.from("cafebabe", "hex"));
+      const res = fromScVal(scVal);
+      expect(res).toBeInstanceOf(Uint8Array);
+      expect(Buffer.from(res).toString("hex")).toBe("cafebabe");
+    });
+
+    it("decodes scvAddress to string", () => {
+      const scVal = toScVal(userAddress, "address");
+      expect(scVal.switch().name).toBe("scvAddress");
+      expect(fromScVal(scVal)).toBe(userAddress);
+    });
+
+    it("decodes scvI128 to bigint", () => {
+      const scVal = toScVal(-1234567890123456789n, "i128");
+      expect(scVal.switch().name).toBe("scvI128");
+      expect(fromScVal(scVal)).toBe(-1234567890123456789n);
+    });
+
+    it("decodes scvU128 to bigint", () => {
+      const scVal = toScVal(340282366920938463463374607431768211455n, "u128");
+      expect(scVal.switch().name).toBe("scvU128");
+      expect(fromScVal(scVal)).toBe(340282366920938463463374607431768211455n);
+    });
+
+    it("decodes scvVec to array", () => {
+      const scVal = xdr.ScVal.scvVec([
+        toScVal(1, "u32"),
+        toScVal("two", "string"),
+        toScVal(true),
+      ]);
+      expect(fromScVal(scVal)).toEqual([1, "two", true]);
+    });
+
+    it("decodes scvMap to object", () => {
+      const scVal = xdr.ScVal.scvMap([
+        new xdr.ScMapEntry({
+          key: toScVal("a", "symbol"),
+          val: toScVal(1, "u32"),
+        }),
+        new xdr.ScMapEntry({
+          key: toScVal("b", "symbol"),
+          val: toScVal(2, "u32"),
+        }),
+      ]);
+      expect(fromScVal(scVal)).toEqual({ a: 1, b: 2 });
+    });
   });
 
   describe("ContractClient", () => {

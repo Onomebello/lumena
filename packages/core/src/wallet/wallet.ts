@@ -14,12 +14,23 @@ export interface WalletOpts {
   ownerKeypair?: Keypair;
 }
 
-export interface WalletAnalytics {
-  address: string;
-  totalTransactions: number;
-  totalXlmVolume: string;
-  policyViolations: number;
-  lastTransactionAt: string | null;
+export interface WalletRegistry {
+  register(address: string): Promise<void> | void;
+  list(): Promise<string[]> | string[];
+}
+
+export class InMemoryWalletRegistry implements WalletRegistry {
+  private addresses: string[] = [];
+
+  register(address: string): void {
+    if (!this.addresses.includes(address)) {
+      this.addresses.push(address);
+    }
+  }
+
+  list(): string[] {
+    return [...this.addresses];
+  }
 }
 
 export class Wallet {
