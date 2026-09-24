@@ -5,7 +5,7 @@ import { createSponsoredAccount } from "../stellar/account.js";
 import { setupMultisig } from "../stellar/multisig.js";
 import { KeyManager } from "../keys/manager.js";
 import { ContractClient } from "../soroban/client.js";
-import type { ContractSimulationResult } from "@lumen/types";
+import type { ContractSimulationResult, OperationSpec } from "@lumen/types";
 
 export interface WalletOpts {
   client: StellarClient;
@@ -147,6 +147,55 @@ export class Wallet {
 
     tx.sign(this._keypair);
     return tx.toXDR();
+  }
+
+  async buildTransaction(operations: OperationSpec[]): Promise<string> {
+    if (!this._keypair) throw new Error("Wallet not initialized");
+    if (operations.length === 0) {
+      throw new Error("At least one operation is required");
+    }
+
+    const account = await this.client.horizon.loadAccount(this.address);
+
+    const builder = new TransactionBuilder(account, {
+      fee: BASE_FEE,
+      networkPassphrase: this.client.networkPassphrase,
+    });
+
+    for (const spec of operations) {
+      builder.addOperation(this.toOperation(spec));
+    }
+
+    const tx = builder.setTimeout(180).build();
+    tx.sign(this._keypair);
+    return tx.toXDR();
+  }
+
+  private toOperation(spec: OperationSpec): any {
+    switch (spec.type) {
+      case "payment":
+        return Operation.payment({
+          destination: spec.destination,
+          asset: spec.asset,
+          amount: spec.amount,
+        });
+      case "createAccount":
+        return Operation.createAccount({
+          destination: spec.destination,
+          startingBalance: spec.startingBalance,
+        });
+      case "changeTrust":
+        return Operation.changeTrust({ asset: spec.asset });
+      case "manageData":
+        return Operation.manageData({
+          name: spec.name,
+          value: spec.value ?? null,
+        });
+      default: {
+        const exhaustive: never = spec;
+        throw new Error(`Unsupported operation type: ${(exhaustive as any).type}`);
+      }
+    }
   }
 
   async simulateContract(

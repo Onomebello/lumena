@@ -11,6 +11,7 @@ export { buildTimeBounds, validateTimeBounds, type TimeBoundsValidationOpts, typ
 export { toScVal, fromScVal } from "./soroban/scval.js";
 export { ContractClient } from "./soroban/client.js";
 export { getWalletAnalytics, type WalletAnalytics } from "./wallet/analytics.js";
+export type { OperationSpec } from "@lumen/types";
 
 
 
