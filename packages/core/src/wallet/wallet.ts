@@ -14,6 +14,14 @@ export interface WalletOpts {
   ownerKeypair?: Keypair;
 }
 
+export interface WalletAnalytics {
+  address: string;
+  totalTransactions: number;
+  totalXlmVolume: string;
+  policyViolations: number;
+  lastTransactionAt: string | null;
+}
+
 export class Wallet {
   private client: StellarClient;
   private sponsorKeypair: Keypair;
@@ -22,6 +30,17 @@ export class Wallet {
   private _address: string | null = null;
   private _keypair: Keypair | null = null;
   private initialOwnerKeypair?: Keypair;
+  private analytics: {
+    totalTransactions: number;
+    totalXlmVolume: bigint;
+    policyViolations: number;
+    lastTransactionAt: string | null;
+  } = {
+    totalTransactions: 0,
+    totalXlmVolume: 0n,
+    policyViolations: 0,
+    lastTransactionAt: null,
+  };
 
   constructor(opts: WalletOpts) {
     this.client = opts.client;
@@ -100,6 +119,7 @@ export class Wallet {
     const result = await this.client.horizon.submitTransaction(tx);
 
     if (result.successful) {
+      this.recordTransaction(asset, amount);
       return { hash: result.hash };
     }
 
@@ -170,10 +190,51 @@ export class Wallet {
 
     const result = await this.client.horizon.submitTransaction(parsed as any);
     if (result.successful) {
+      this.recordTransaction(undefined, undefined);
       return { hash: result.hash };
     }
 
     throw new Error(`Contract invocation failed: ${result.hash}`);
+  }
+
+  private recordTransaction(asset: Asset | undefined, amount: string | undefined): void {
+    this.analytics.totalTransactions += 1;
+    this.analytics.lastTransactionAt = new Date().toISOString();
+
+    if (asset && asset.isNative() && amount) {
+      const stroops = this.toStroops(amount);
+      if (stroops !== null) {
+        this.analytics.totalXlmVolume += stroops;
+      }
+    }
+  }
+
+  private toStroops(amount: string): bigint | null {
+    const match = /^(\d+)(?:\.(\d+))?$/.exec(amount.trim());
+    if (!match) return null;
+    const whole = BigInt(match[1]);
+    const fraction = (match[2] ?? "").padEnd(7, "0").slice(0, 7);
+    return whole * 10_000_000n + BigInt(fraction);
+  }
+
+  private fromStroops(stroops: bigint): string {
+    const whole = stroops / 10_000_000n;
+    const fraction = (stroops % 10_000_000n).toString().padStart(7, "0").replace(/0+$/, "");
+    return fraction.length > 0 ? `${whole}.${fraction}` : whole.toString();
+  }
+
+  recordPolicyViolation(): void {
+    this.analytics.policyViolations += 1;
+  }
+
+  getAnalytics(): WalletAnalytics {
+    return {
+      address: this.address,
+      totalTransactions: this.analytics.totalTransactions,
+      totalXlmVolume: this.fromStroops(this.analytics.totalXlmVolume),
+      policyViolations: this.analytics.policyViolations,
+      lastTransactionAt: this.analytics.lastTransactionAt,
+    };
   }
 
   getAddress(): string {

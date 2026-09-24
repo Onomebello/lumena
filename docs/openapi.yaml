@@ -149,6 +149,29 @@ paths:
                 required:
                   - address
                   - publicKey
+  /wallet/{address}/analytics:
+    get:
+      summary: Get Wallet Spending Analytics
+      description: Returns aggregated spending analytics for a wallet, sourced from the in-memory policy store trackers. Requires API key authentication.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Stellar public key address of the wallet.
+          example: GAD7654...
+      responses:
+        '200':
+          description: Wallet spending analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletAnalytics'
+        '401':
+          description: Missing or invalid API key
   /policy:
     post:
       summary: Create or Update Wallet Policy
@@ -202,7 +225,42 @@ paths:
         '404':
           description: No policy found for wallet
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
   schemas:
+    WalletAnalytics:
+      type: object
+      properties:
+        address:
+          type: string
+          example: GAD7654...
+        totalTransactions:
+          type: integer
+          description: Total transactions co-signed for the wallet.
+          example: 42
+        totalXlmVolume:
+          type: string
+          description: Total XLM volume co-signed for the wallet.
+          example: "1250.0000000"
+        policyViolations:
+          type: integer
+          description: Number of policy violations recorded for the wallet.
+          example: 3
+        lastTransactionAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of the last co-signed transaction, or null if none.
+          example: "2024-05-01T12:34:56.000Z"
+      required:
+        - address
+        - totalTransactions
+        - totalXlmVolume
+        - policyViolations
+        - lastTransactionAt
     SpendLimitRule:
       type: object
       properties:
