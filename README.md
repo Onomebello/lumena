@@ -20,7 +20,8 @@ Lumen is a wallet SDK for building non-custodial Stellar wallets where the user 
 5. [Quickstart](#quickstart)
 6. [Packages](#packages)
 7. [Environment](#environment)
-8. [License](#license)
+8. [SEP-10 Authentication](#sep-10-authentication)
+9. [License](#license)
 
 ---
 
@@ -34,6 +35,7 @@ Lumen is a wallet SDK for building non-custodial Stellar wallets where the user 
 | **Policy-controlled** | Spend limits, velocity rules, and destination allowlists enforced on-chain before co-signing. |
 | **Sponsorship** | The server pays XLM reserves for account creation and transaction fees. |
 | **Hardware-backed signing** | `Signer` abstraction supports AWS KMS, CloudHSM, and HashiCorp Vault for production. |
+| **SEP-10 auth** | Authenticate by proving ownership of a Stellar keypair — no passwords. |
 
 ---
 
@@ -55,7 +57,7 @@ User creates a wallet
 | Policy | `@lumen/server` | Spend limits, velocity, allowlists enforced before co-signing |
 | Key management | `@lumen/core` | Keypair generation, storage, derivation (OAuth, passphrase) |
 | SDK | `@lumen/web-sdk` | Browser client: `createWallet`, `getBalance`, `sendPayment` |
-| API | Express | `/cosign`, `/fee-bump`, `/wallet/create`, `/policy` |
+| API | Express | `/cosign`, `/fee-bump`, `/wallet/create`, `/policy`, `/auth` |
 
 ---
 
@@ -119,6 +121,42 @@ pnpm --filter @lumen/server dev
 | **`@lumen/server`** | `CosignerService`, `FeeSponsorService`, `PolicyEngine`, Express API |
 | **`@lumen/web-sdk`** | `LumenClient`: `createWallet`, `getBalance`, `sendPayment` |
 | **`@lumen/types`** | Shared TypeScript interfaces |
+
+---
+
+## SEP-10 Authentication
+
+Lumen supports [SEP-10](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0010.md) Web Authentication, letting clients authenticate by proving ownership of a Stellar keypair instead of using a password. The server exposes the following endpoints:
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `GET` | `/.well-known/stellar.toml` | Serves the server's Stellar TOML file, including `WEB_AUTH_ENDPOINT` and `SIGNING_KEY`. |
+| `GET` | `/auth` | Issues a SEP-10 challenge transaction for the requested account. |
+| `POST` | `/auth` | Verifies the signed challenge transaction and returns a JWT. |
+
+### Flow
+
+1. **Discover** — The client fetches `GET /.well-known/stellar.toml` to learn the `WEB_AUTH_ENDPOINT` and the server's `SIGNING_KEY`.
+2. **Challenge** — The client calls `GET /auth?account=G...` and receives a base64-encoded challenge transaction, signed by the server's signing key, with the client's account as the source.
+3. **Sign** — The client signs the challenge transaction with the secret key for the requested account.
+4. **Verify** — The client submits the signed transaction to `POST /auth` (as `application/x-www-form-urlencoded` with a `transaction` field). The server verifies the signatures and challenge, then returns a JWT.
+5. **Authenticate** — The client includes the JWT in the `Authorization: Bearer <token>` header on subsequent requests.
+
+### Example
+
+```bash
+# 1. Fetch the challenge
+curl "http://localhost:3000/auth?account=GABC...XYZ"
+
+# 2. Sign the returned transaction with the account's secret key, then submit it
+curl -X POST http://localhost:3000/auth \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "transaction=<base64-signed-challenge-xdr>"
+
+# 3. Use the returned JWT
+curl http://localhost:3000/wallet/create \
+  -H "Authorization: Bearer <jwt>"
+```
 
 ---
 
